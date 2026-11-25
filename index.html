@@ -1,1 +1,321 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CLICK MASTER</title>
+<style>
+*{box-sizing:border-box}
+body{
+ margin:0;background:linear-gradient(135deg,#100024,#25004d,#080018);
+ color:white;font-family:Arial,sans-serif;text-align:center;
+ padding:15px;padding-bottom:45px
+}
+h1{color:#c77dff;font-size:38px;text-shadow:0 0 18px #a020f0}
+.panel{
+ background:#ffffff12;border:1px solid #a855f7;
+ border-radius:16px;padding:15px;margin:12px auto;
+ max-width:650px
+}
+.stats{display:flex;justify-content:center;gap:10px;flex-wrap:wrap}
+.stat{background:#321052;padding:12px;border-radius:12px;min-width:100px}
+button{
+ background:#922be9;color:white;border:0;border-radius:10px;
+ padding:12px 16px;font-weight:bold;margin:5px;font-size:14px;
+ cursor:pointer
+}
+button:disabled{opacity:.4}
+#clickButton{
+ width:190px;height:190px;border-radius:50%;
+ font-size:27px;background:linear-gradient(135deg,#b44aff,#6200b3);
+ box-shadow:0 0 30px #a020f0;margin:20px
+}
+#clickButton:active{transform:scale(.94)}
+input{
+ padding:13px;border-radius:10px;border:0;font-size:16px;
+ max-width:90%
+}
+.layout{display:grid;grid-template-columns:1fr;gap:12px}
+.item{
+ background:#291044;padding:12px;border-radius:12px;
+ margin:8px 0;text-align:left
+}
+.small{font-size:13px;color:#d9b5ff}
+#message{color:#ffe66d;min-height:25px}
+@media(min-width:700px){
+ .layout{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+<body>
+
+<h1>⚡ CLICK MASTER ⚡</h1>
+<p>The ultimate clicking challenge!</p>
+
+<div id="login" class="panel">
+ <h2>Welcome, Master!</h2>
+ <p>Enter your player name:</p>
+ <input id="nameInput" placeholder="Your name" maxlength="16">
+ <br><button onclick="joinGame()">JOIN GAME</button>
+</div>
+
+<div id="game" style="display:none">
+
+<div class="stats">
+ <div class="stat">💰 Coins<br><b id="coins">0</b></div>
+ <div class="stat">🖱️ Total clicks<br><b id="total">0</b></div>
+ <div class="stat">⚡ Per click<br><b id="power">1</b></div>
+ <div class="stat">🏅 Badges<br><b id="badgeCount">0</b></div>
+</div>
+
+<div class="panel">
+ <h2>Welcome, <span id="playerName"></span>!</h2>
+ <button id="clickButton" onclick="clickGame()">TAP!</button>
+ <p id="message">Start clicking!</p>
+ <h3>⏱️ Timed Challenges</h3>
+ <button onclick="startTimer(30)">30 Seconds</button>
+ <button onclick="startTimer(60)">60 Seconds</button>
+ <p id="timer">No active challenge</p>
+ <p>Session clicks: <b id="session">0</b></p>
+ <p>Best session: <b id="best">0</b></p>
+</div>
+
+<div class="layout">
+
+<div class="panel">
+ <h2>🎯 QUESTS</h2>
+ <p class="small">Complete challenges to earn coins!</p>
+ <div id="quests"></div>
+</div>
+
+<div class="panel">
+ <h2>🛒 SHOP</h2>
+ <p>Buy upgrades using your coins.</p>
+ <div class="item">
+  <b>⚡ Double Clicker</b>
+  <p>Get 2 clicks per tap.</p>
+  <p>Cost: 1,000 coins</p>
+  <button onclick="buyUpgrade(2,1000)">BUY</button>
+ </div>
+ <div class="item">
+  <b>🔥 Triple Clicker</b>
+  <p>Get 3 clicks per tap.</p>
+  <p>Cost: 5,000 coins</p>
+  <button onclick="buyUpgrade(3,5000)">BUY</button>
+ </div>
+ <div class="item">
+  <b>💥 Mega Clicker</b>
+  <p>Get 4 clicks per tap.</p>
+  <p>Cost: 10,000 coins</p>
+  <button onclick="buyUpgrade(4,10000)">BUY</button>
+ </div>
+ <div class="item">
+  <b>🧙 Wizard Companion</b>
+  <p>Your wizard clicks alongside you!</p>
+  <p>Cost: 25,000 coins</p>
+  <button onclick="buyWizard()">BUY</button>
+ </div>
+</div>
+
+<div class="panel">
+ <h2>🏅 BADGES</h2>
+ <div id="badges">Start playing to unlock badges!</div>
+</div>
+
+<div class="panel">
+ <h2>🏆 LEADERBOARD</h2>
+ <p class="small">Local player records on this device</p>
+ <div id="leaderboard"></div>
+</div>
+
+</div>
+</div>
+
+<script>
+const quests=[
+ {clicks:100,time:30,reward:50},
+ {clicks:250,time:30,reward:75},
+ {clicks:500,time:60,reward:100},
+ {clicks:1000,time:60,reward:150},
+ {clicks:2000,time:60,reward:250},
+ {clicks:5000,time:60,reward:500},
+ {clicks:10000,time:60,reward:1000},
+ {clicks:20000,time:60,reward:2000},
+ {clicks:50000,time:60,reward:5000},
+ {clicks:100000,time:60,reward:10000,wizard:true}
+];
+
+let data={
+ name:"",coins:0,total:0,power:1,wizard:false,
+ wizardClicks:0,best:0,completed:[],badges:[]
+};
+
+let session=0,timeLeft=0,interval=null,activeQuest=null;
+
+function load(){
+ try{
+  const saved=JSON.parse(localStorage.getItem("clickMasterSave"));
+  if(saved)data={...data,...saved};
+ }catch(e){}
+}
+
+function save(){
+ localStorage.setItem("clickMasterSave",JSON.stringify(data));
+}
+
+function joinGame(){
+ let name=document.getElementById("nameInput").value.trim();
+ if(!name)return alert("Enter your name first!");
+ data.name=name;
+ save();
+ showGame();
+}
+
+function showGame(){
+ document.getElementById("login").style.display="none";
+ document.getElementById("game").style.display="block";
+ document.getElementById("playerName").textContent=data.name;
+ update();
+}
+
+function clickGame(){
+ if(!data.name)return;
+ data.total+=data.power;
+ session+=data.power;
+
+ if(data.wizard){
+  data.wizardClicks++;
+  data.total++;
+ }
+ if(session>data.best)data.best=session;
+
+ checkBadges();
+ update();
+}
+
+function startTimer(seconds,questIndex=null){
+ clearInterval(interval);
+ timeLeft=seconds;
+ session=0;
+ activeQuest=questIndex;
+ update();
+
+ interval=setInterval(()=>{
+  timeLeft--;
+  document.getElementById("timer").textContent=
+   "Time left: "+timeLeft+" seconds";
+
+  if(timeLeft<=0){
+   clearInterval(interval);
+   if(activeQuest!==null){
+    let q=quests[activeQuest];
+    if(session>=q.clicks && (!q.wizard || data.wizardClicks>=100000)){
+     if(!data.completed.includes(activeQuest)){
+      data.completed.push(activeQuest);
+      data.coins+=q.reward;
+      document.getElementById("message").textContent=
+       "🎉 QUEST COMPLETED! +"+q.reward+" coins!";
+     }
+    }else{
+     document.getElementById("message").textContent=
+      "Time's up! Try again!";
+    }
+   }else{
+    document.getElementById("message").textContent=
+     "Challenge finished!";
+   }
+   activeQuest=null;
+   update();
+  }
+ },1000);
+}
+
+function buyUpgrade(power,cost){
+ if(data.power>=power){
+  alert("You already have this upgrade or a better one!");
+  return;
+ }
+ if(data.coins<cost)return alert("Not enough coins!");
+ data.coins-=cost;
+ data.power=power;
+ save();
+ update();
+ alert("Upgrade purchased! ⚡");
+}
+
+function buyWizard(){
+ if(data.wizard)return alert("You already own the Wizard!");
+ if(data.coins<25000)return alert("You need 25,000 coins!");
+ data.coins-=25000;
+ data.wizard=true;
+ save();
+ update();
+ alert("🧙 Your Wizard has joined you!");
+}
+
+function checkBadges(){
+ const awards=[
+  {n:"First Click",v:1},
+  {n:"100 Clicks",v:100},
+  {n:"1K Master",v:1000},
+  {n:"10K Legend",v:10000},
+  {n:"100K Champion",v:100000},
+  {n:"Millionaire Clicker",v:1000000}
+ ];
+ awards.forEach(a=>{
+  if(data.total>=a.v && !data.badges.includes(a.n)){
+   data.badges.push(a.n);
+   document.getElementById("message").textContent=
+    "🏅 NEW BADGE: "+a.n+"!";
+  }
+ });
+}
+
+function renderQuests(){
+ const box=document.getElementById("quests");
+ box.innerHTML="";
+ quests.forEach((q,i)=>{
+  const done=data.completed.includes(i);
+  const div=document.createElement("div");
+  div.className="item";
+  div.innerHTML=`
+   <b>Quest ${i+1}: ${q.clicks.toLocaleString()} clicks</b>
+   <p>${q.time} seconds</p>
+   <p>Reward: 💰 ${q.reward.toLocaleString()} coins</p>
+   ${q.wizard?'<p>Requires 100,000 Wizard clicks</p>':""}
+   <button ${done?"disabled":""}
+    onclick="startTimer(${q.time},${i})">
+    ${done?"COMPLETED":"START QUEST"}
+   </button>`;
+  box.appendChild(div);
+ });
+}
+
+function update(){
+ document.getElementById("coins").textContent=data.coins.toLocaleString();
+ document.getElementById("total").textContent=data.total.toLocaleString();
+ document.getElementById("power").textContent=data.power;
+ document.getElementById("session").textContent=session.toLocaleString();
+ document.getElementById("best").textContent=data.best.toLocaleString();
+ document.getElementById("badgeCount").textContent=data.badges.length;
+
+ document.getElementById("timer").textContent=
+  timeLeft>0?"Time left: "+timeLeft+" seconds":"No active challenge";
+
+ document.getElementById("badges").innerHTML=
+  data.badges.length?data.badges.map(b=>"🏅 "+b).join("<br>"):"No badges yet!";
+
+ document.getElementById("leaderboard").innerHTML=
+  "🥇 "+data.name+" — "+data.total.toLocaleString()+" clicks";
+
+ renderQuests();
+ save();
+}
+
+load();
+if(data.name)showGame();
+</script>
+</body>
+</html>
 CLICK MASTER
